@@ -1,0 +1,41 @@
+{
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "contentProtected": true,
+        "fullscreen": false,
+        "height": 800,
+        "minHeight": 600,
+        "minWidth": 800,
+        "resizable": true,
+        "title": "Hamrahtel",
+        "titleBarStyle": "Overlay",
+        "width": 1280
+      }
+    ]
+  },
+  "build": {
+    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../build"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "windows": {
+      "allowDowngrades": false
+    }
+  },
+  "identifier": "com.gsmapp.hamrahtel",
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  },
+  "productName": "Hamrahtel",
+  "version": "0.0.0"
+}

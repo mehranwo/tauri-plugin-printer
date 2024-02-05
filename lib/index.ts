@@ -1,13 +1,13 @@
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import { jobStatus } from './constants'
 import { Buffer } from 'buffer'
 import { Jobs, PrintFileOptions, PrintOptions, PrintSettings, Printer, ResponseResult } from './types'
 import { PrintData } from './types'
-import { ResponseType, getClient } from '@tauri-apps/api/http';
+import { fetch } from '@tauri-apps/plugin-http';
 import mime from "mime";
-import {toDataURL as qrCodeToDataUrl} from 'qrcode'
+import { toDataURL as qrCodeToDataUrl } from 'qrcode'
 import * as JsBarcode from "jsbarcode";
-import { WebviewWindow } from '@tauri-apps/api/window'
+import { WebviewWindow } from '@tauri-apps/api/webview'
 import * as _html2canvas from "html2canvas";
 const html2canvas: any = _html2canvas;
 import jsPDF from 'jspdf'
@@ -20,7 +20,7 @@ const parseIfJSON = (str: string, dft: any = []): any => {
 }
 
 const encodeBase64 = (str: string): string => {
-    if (typeof window === "undefined"){
+    if (typeof window === "undefined") {
         // in nodejs
         return Buffer.from(str, 'utf-8').toString('base64')
     } else {
@@ -29,7 +29,7 @@ const encodeBase64 = (str: string): string => {
     }
 }
 const decodeBase64 = (str: string): string => {
-    if (typeof window === "undefined"){
+    if (typeof window === "undefined") {
         // in nodejs
         return Buffer.from(str, 'base64').toString('utf-8')
     } else {
@@ -43,8 +43,8 @@ const decodeBase64 = (str: string): string => {
  *
  * @returns A array of printer detail.
  */
-export const printers = async (id: string|null = null): Promise<Printer[]> => {
-    if (id != null){
+export const printers = async (id: string | null = null): Promise<Printer[]> => {
+    if (id != null) {
         const printername = decodeBase64(id);
         const result: string = await invoke('plugin:printer|get_printers_by_name', {
             printername
@@ -61,7 +61,7 @@ export const printers = async (id: string|null = null): Promise<Printer[]> => {
                 port_name: item.PortName,
                 share_name: item.ShareName,
                 computer_name: item.ComputerName,
-                printer_status: item.PrinterStatus, 
+                printer_status: item.PrinterStatus,
                 shared: item.Shared,
                 type: item.Type,
                 priority: item.Priority
@@ -72,10 +72,10 @@ export const printers = async (id: string|null = null): Promise<Printer[]> => {
     const listRaw: any[] = parseIfJSON(result)
     const printers: Printer[] = [];
 
-    for (let i = 0; i<listRaw.length; i++){
+    for (let i = 0; i < listRaw.length; i++) {
         const item: any = listRaw[i]
         const id = encodeBase64(item.Name);
-        
+
         printers.push({
             id,
             name: item.Name,
@@ -85,7 +85,7 @@ export const printers = async (id: string|null = null): Promise<Printer[]> => {
             port_name: item.PortName,
             share_name: item.ShareName,
             computer_name: item.ComputerName,
-            printer_status: item.PrinterStatus, 
+            printer_status: item.PrinterStatus,
             shared: item.Shared,
             type: item.Type,
             priority: item.Priority
@@ -116,13 +116,13 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
     container.style.height = "fit-content"
     container.style.color = "#000"
     container.style.fontSize = '12px'
-    
 
-    for (const item of data){
-        if (item.type == 'image'){
+
+    for (const item of data) {
+        if (item.type == 'image') {
             const wrapperImage = document.createElement('div')
             wrapperImage.style.width = "100%"
-            if (item?.position == "center"){
+            if (item?.position == "center") {
                 wrapperImage.style.display = 'flex'
                 wrapperImage.style.justifyContent = 'center'
             }
@@ -130,24 +130,25 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
             if (typeof item.url == "undefined") throw new Error('Image required {url}')
             const image: any = document.createElement('img')
             image.width = 100,
-            image.height = 100
-            const client = await getClient();
-            const response: any = await client.get(item.url, {
-                responseType: ResponseType.Binary
-            });
+                image.height = 100
+            // const client = await getClient();
+            // const response: any = await client.get(item.url, {
+            //     responseType: ResponseType.Binary
+            // });
+            const response: any = await fetch(item.url);
 
             image.src = `data:${mime.getType(item.url)};base64,${Buffer.from(response.data).toString('base64')}`
-            if (item.width){
+            if (item.width) {
                 image.width = item.width
             }
 
-            if (item.height){
+            if (item.height) {
                 image.height = item.height
             }
 
-            if (item.style){
+            if (item.style) {
                 const styles = item.style as any
-                for (const style of Object.keys(styles)){
+                for (const style of Object.keys(styles)) {
                     const key = style as any
                     image.style[key] = styles[key]
                 }
@@ -157,17 +158,17 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
             container.appendChild(wrapperImage)
         }
 
-        if (item.type == 'text'){
+        if (item.type == 'text') {
             const textWrapper = document.createElement('div')
             textWrapper.style.width = "100%"
-            
-            if (item.value){
+
+            if (item.value) {
                 textWrapper.innerHTML = item.value
             }
 
-            if (item.style){
+            if (item.style) {
                 const styles = item.style as any
-                for (const style of Object.keys(styles)){
+                for (const style of Object.keys(styles)) {
                     const key = style as any
                     textWrapper.style[key] = styles[key]
                 }
@@ -176,29 +177,29 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
             container.appendChild(textWrapper)
         }
 
-        if (item.type == 'table'){
+        if (item.type == 'table') {
             const tableWrapper = document.createElement('div')
             tableWrapper.style.width = "100%"
             const table = document.createElement('table')
             const tableHead = document.createElement('thead')
             const trHead = document.createElement('tr')
             tableHead.appendChild(trHead)
-            
-            if (item.tableHeader){
-                for (const head of item.tableHeader){
+
+            if (item.tableHeader) {
+                for (const head of item.tableHeader) {
                     const tdHead = document.createElement('td')
                     tdHead.innerText = head.toString()
                     trHead.appendChild(tdHead)
                 }
             }
-            
+
             table.appendChild(tableHead)
             const tableBody = document.createElement('tbody')
-            
-            if (item.tableBody){
-                for (const tr of item.tableBody){
+
+            if (item.tableBody) {
+                for (const tr of item.tableBody) {
                     const trBody = document.createElement('tr')
-                    for (const td of tr){
+                    for (const td of tr) {
                         const tdBody = document.createElement('td')
                         tdBody.innerText = td.toString()
                         trBody.appendChild(tdBody)
@@ -208,10 +209,10 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
                 }
             }
             table.appendChild(tableBody)
-            
-            if (item.style){
+
+            if (item.style) {
                 const styles = item.style as any
-                for (const style of Object.keys(styles)){
+                for (const style of Object.keys(styles)) {
                     const key = style as any
                     table.style[key] = styles[key]
                 }
@@ -220,11 +221,11 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
             tableWrapper.appendChild(table)
             container.appendChild(tableWrapper)
         }
-        
-        if (item.type == 'qrCode'){
+
+        if (item.type == 'qrCode') {
             const wrapperImage = document.createElement('div')
             wrapperImage.style.width = "100%"
-            if (item?.position == "center"){
+            if (item?.position == "center") {
                 wrapperImage.style.display = 'flex'
                 wrapperImage.style.justifyContent = 'center'
             }
@@ -237,31 +238,31 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
                 })
             })
 
-            if (item.width){
+            if (item.width) {
                 image.width = item.width
             }
 
-            if (item.height){
+            if (item.height) {
                 image.height = item.height
             }
-            
-            if (item.style){
+
+            if (item.style) {
                 const styles = item.style as any
-                for (const style of Object.keys(styles)){
+                for (const style of Object.keys(styles)) {
                     const key = style as any
                     image.style[key] = styles[key]
                 }
             }
-            
+
             wrapperImage.appendChild(image)
 
             container.appendChild(wrapperImage)
         }
 
-        if (item.type == 'barCode'){
+        if (item.type == 'barCode') {
             const wrapperImage = document.createElement('div')
             wrapperImage.style.width = "100%"
-            if (item?.position == "center"){
+            if (item?.position == "center") {
                 wrapperImage.style.display = 'flex'
                 wrapperImage.style.justifyContent = 'center'
             }
@@ -275,18 +276,18 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
             image.style.objectFit = "contain"
             image.style.width = '100%'
 
-            if (item.height){
+            if (item.height) {
                 image.height = item.height
             }
-            
-            if (item.style){
+
+            if (item.style) {
                 const styles = item.style as any
-                for (const style of Object.keys(styles)){
+                for (const style of Object.keys(styles)) {
                     const key = style as any
                     image.style[key] = styles[key]
                 }
             }
-            
+
             wrapperImage.appendChild(image)
 
             container.appendChild(wrapperImage)
@@ -305,7 +306,7 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
     hidder.appendChild(container)
     document.body.appendChild(hidder)
     const wrapper: any = document.querySelector('#wrapper')
-    if (options.preview == true){
+    if (options.preview == true) {
         const webview = new WebviewWindow(Date.now().toString(), {
             url: `data:text/html,${htmlData}`,
             title: "Print Preview",
@@ -342,10 +343,10 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
     wrapper.remove()
 
     let id: string = "";
-    if (typeof options.id != 'undefined'){
+    if (typeof options.id != 'undefined') {
         id = decodeBase64(options.id);
-    } 
-    if (typeof options.name != 'undefined'){
+    }
+    if (typeof options.name != 'undefined') {
         id = options.name
     }
     // 
@@ -364,20 +365,20 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
     if (typeof options?.print_setting?.repeat != "undefined") printerSettings.repeat = options.print_setting.repeat;
     if (typeof options?.print_setting?.color_type != "undefined") printerSettings.color_type = options.print_setting.color_type;
     if (typeof options?.print_setting?.range != "undefined") printerSettings.range = options.print_setting.range;
-    
+
     let rangeStr = ""
-    if (printerSettings.range){
-        if (typeof printerSettings.range == 'string'){
+    if (printerSettings.range) {
+        if (typeof printerSettings.range == 'string') {
             if (!(new RegExp(/^[0-9,]+$/).test(printerSettings.range))) throw new Error('Invalid range value ')
-            rangeStr = printerSettings.range[printerSettings.range.length-1] != "," ? printerSettings.range : printerSettings.range.substring(0, printerSettings.range.length-1)     
+            rangeStr = printerSettings.range[printerSettings.range.length - 1] != "," ? printerSettings.range : printerSettings.range.substring(0, printerSettings.range.length - 1)
         }
         else
-        if (printerSettings.range.from){
-            rangeStr = `${printerSettings.range.from}-${printerSettings.range.to}`
-        }
+            if (printerSettings.range.from) {
+                rangeStr = `${printerSettings.range.from}-${printerSettings.range.to}`
+            }
     }
-    
-    const printerSettingStr = `-print-settings ${rangeStr},${printerSettings.paper},${printerSettings.method},${printerSettings.scale},${printerSettings.orientation},${printerSettings.color_type},${printerSettings.repeat}x` 
+
+    const printerSettingStr = `-print-settings ${rangeStr},${printerSettings.paper},${printerSettings.method},${printerSettings.scale},${printerSettings.orientation},${printerSettings.color_type},${printerSettings.repeat}x`
 
     const filename: string = `${Math.floor(Math.random() * 100000000)}_${Date.now()}.pdf`;
     const tempPath: string = await invoke('plugin:printer|create_temp_file', {
@@ -407,11 +408,11 @@ export const print = async (data: PrintData[], options: PrintOptions): Promise<R
  * @returns A process status.
  */
 export const print_file = async (options: PrintFileOptions): Promise<ResponseResult> => {
-    if (options.id == undefined && options.name == undefined) throw new Error('print_file require id | name as string') 
-    if (options.path == undefined && options.file == undefined) throw new Error('print_file require parameter path as string | file as Buffer')   
+    if (options.id == undefined && options.name == undefined) throw new Error('print_file require id | name as string')
+    if (options.path == undefined && options.file == undefined) throw new Error('print_file require parameter path as string | file as Buffer')
     let id: string | undefined = "";
 
-    if (typeof options.id != 'undefined'){
+    if (typeof options.id != 'undefined') {
         id = decodeBase64(options.id);
     } else {
         id = options.name
@@ -430,26 +431,26 @@ export const print_file = async (options: PrintFileOptions): Promise<ResponseRes
     if (typeof options?.print_setting?.orientation != "undefined") printerSettings.orientation = options.print_setting.orientation;
     if (typeof options?.print_setting?.repeat != "undefined") printerSettings.repeat = options.print_setting.repeat;
     if (typeof options?.print_setting?.range != "undefined") printerSettings.range = options.print_setting.range;
-    if (typeof options.path != "undefined"){
+    if (typeof options.path != "undefined") {
         if (options.path.split('.').length <= 1) throw new Error('File not supported');
-        if (options.path.split('.').pop() != 'pdf' ) throw new Error('File not supported');
+        if (options.path.split('.').pop() != 'pdf') throw new Error('File not supported');
     }
     let rangeStr = ""
-    if (printerSettings.range){
-        if (typeof printerSettings.range == 'string'){
+    if (printerSettings.range) {
+        if (typeof printerSettings.range == 'string') {
             if (!(new RegExp(/^[0-9,]+$/).test(printerSettings.range))) throw new Error('Invalid range value ')
-            rangeStr = printerSettings.range[printerSettings.range.length-1] != "," ? printerSettings.range : printerSettings.range.substring(0, printerSettings.range.length-1)     
+            rangeStr = printerSettings.range[printerSettings.range.length - 1] != "," ? printerSettings.range : printerSettings.range.substring(0, printerSettings.range.length - 1)
         }
         else
-        if (printerSettings.range.from){
-            rangeStr = `${printerSettings.range.from}-${printerSettings.range.to}`
-        }
+            if (printerSettings.range.from) {
+                rangeStr = `${printerSettings.range.from}-${printerSettings.range.to}`
+            }
     }
-    
-    const printerSettingStr = `-print-settings ${rangeStr},${printerSettings.paper},${printerSettings.method},${printerSettings.scale},${printerSettings.orientation},${printerSettings.repeat}x` 
+
+    const printerSettingStr = `-print-settings ${rangeStr},${printerSettings.paper},${printerSettings.method},${printerSettings.scale},${printerSettings.orientation},${printerSettings.repeat}x`
 
     let tempPath: string = ""
-    if (typeof options.file != "undefined"){
+    if (typeof options.file != "undefined") {
         const fileSignature = options.file.subarray(0, 4).toString('hex');
         if (fileSignature != "25504446") throw new Error('File not supported');
         if (Buffer.isBuffer(options.file) == false) throw new Error('Invalid buffer');
@@ -464,17 +465,17 @@ export const print_file = async (options: PrintFileOptions): Promise<ResponseRes
 
     const optionsParams: any = {
         id: `"${id}"`,
-        path: options.path, 
+        path: options.path,
         printer_setting: printerSettingStr,
         remove_after_print: options.remove_temp ? options.remove_temp : true
     }
 
-    if (typeof options.file != "undefined"){
+    if (typeof options.file != "undefined") {
         optionsParams.path = tempPath
     }
-    
+
     await invoke('plugin:printer|print_pdf', optionsParams)
-    
+
     return {
         success: true,
         message: "OK"
@@ -486,15 +487,15 @@ export const print_file = async (options: PrintFileOptions): Promise<ResponseRes
  * Get all jobs.
  * @returns A array of all printer jobs.
  */
-export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
+export const jobs = async (printerid: string | null = null): Promise<Jobs[]> => {
     const allJobs: Jobs[] = []
-    if (printerid != null){
-        const printer = await printers(printerid)    
+    if (printerid != null) {
+        const printer = await printers(printerid)
         if (printer.length == 0) return []
-        const result: any = await invoke('plugin:printer|get_jobs', {printername: printer[0].name})
+        const result: any = await invoke('plugin:printer|get_jobs', { printername: printer[0].name })
         let listRawJobs: any = parseIfJSON(result, [])
         if (listRawJobs.length == undefined) listRawJobs = [listRawJobs]
-        for (const job of listRawJobs){
+        for (const job of listRawJobs) {
             const id = encodeBase64(`${printer[0].name}_@_${job.Id}`);
             allJobs.push({
                 id,
@@ -503,7 +504,7 @@ export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
                     code: job.JobStatus,
                     description: jobStatus[job.JobStatus].description,
                     name: jobStatus[job.JobStatus].name
-                }: {
+                } : {
                     code: job.JobStatus,
                     description: "Unknown Job Status",
                     name: "Unknown"
@@ -517,19 +518,19 @@ export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
                 printer_name: job.PrinterName,
                 priority: job.Priority,
                 size: job.Size,
-                submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/','') : null,
+                submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/', '') : null,
                 total_pages: job.TotalPages,
                 username: job.UserName
             })
         }
         return allJobs;
     }
-    const listPrinter = await printers()    
-    for (const printer of listPrinter){
-        const result: any = await invoke('plugin:printer|get_jobs', {printername: printer.name})
+    const listPrinter = await printers()
+    for (const printer of listPrinter) {
+        const result: any = await invoke('plugin:printer|get_jobs', { printername: printer.name })
         let listRawJobs: any = parseIfJSON(result, [])
         if (listRawJobs.length == undefined) listRawJobs = [listRawJobs]
-        for (const job of listRawJobs){
+        for (const job of listRawJobs) {
             const id = encodeBase64(`${printer.name}_@_${job.Id}`);
             allJobs.push({
                 id,
@@ -538,7 +539,7 @@ export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
                     code: job.JobStatus,
                     description: jobStatus[job.JobStatus].description,
                     name: jobStatus[job.JobStatus].name
-                }: {
+                } : {
                     code: job.JobStatus,
                     description: "Unknown Job Status",
                     name: "Unknown"
@@ -552,7 +553,7 @@ export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
                 printer_name: job.PrinterName,
                 priority: job.Priority,
                 size: job.Size,
-                submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/','') : null,
+                submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/', '') : null,
                 total_pages: job.TotalPages,
                 username: job.UserName
             })
@@ -566,11 +567,11 @@ export const jobs = async (printerid: string|null = null): Promise<Jobs[]> => {
  * Get job by id.
  * @returns Printer job.
  */
-export const job = async (jobid: string): Promise<Jobs|null> => {
+export const job = async (jobid: string): Promise<Jobs | null> => {
     const idextract = decodeBase64(jobid)
     const [printername = null, id = null] = idextract.split('_@_')
     if (printername == null || id == null) null
-    const result: any = await invoke('plugin:printer|get_jobs_by_id', {printername: printername, jobid: id})
+    const result: any = await invoke('plugin:printer|get_jobs_by_id', { printername: printername, jobid: id })
     const job = parseIfJSON(result, null)
     return {
         id: jobid,
@@ -579,7 +580,7 @@ export const job = async (jobid: string): Promise<Jobs|null> => {
             code: job.JobStatus,
             description: jobStatus[job.JobStatus].description,
             name: jobStatus[job.JobStatus].name
-        }: {
+        } : {
             code: job.JobStatus,
             description: "Unknown Job Status",
             name: "Unknown"
@@ -593,7 +594,7 @@ export const job = async (jobid: string): Promise<Jobs|null> => {
         printer_name: job.PrinterName,
         priority: job.Priority,
         size: job.Size,
-        submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/','') : null,
+        submitted_time: job.SubmittedTime ? +job.SubmittedTime?.replace('/Date(', '')?.replace(')/', '') : null,
         total_pages: job.TotalPages,
         username: job.UserName
     }
@@ -604,33 +605,33 @@ export const job = async (jobid: string): Promise<Jobs|null> => {
  * Restart jobs.
  * @param jobid
  */
-export const restart_job = async (jobid: string|null = null): Promise<ResponseResult> => {
+export const restart_job = async (jobid: string | null = null): Promise<ResponseResult> => {
     try {
         const result = {
             success: true,
             message: "OK"
         }
-        if (jobid != null){
+        if (jobid != null) {
             const idextract = decodeBase64(jobid)
-            
+
             const [printername = null, id = null] = idextract.split('_@_')
             if (printername == null || id == null) throw new Error('Wrong jobid')
 
             await invoke('plugin:printer|restart_job', {
-                printername, 
+                printername,
                 jobid: id.toString()
             })
 
             return result;
         }
 
-        const listPrinter = await printers()    
-        for (const printer of listPrinter){
-            const result: any = await invoke('plugin:printer|get_jobs', {printername: printer.name})
+        const listPrinter = await printers()
+        for (const printer of listPrinter) {
+            const result: any = await invoke('plugin:printer|get_jobs', { printername: printer.name })
             const listRawJobs = parseIfJSON(result, [])
-            for (const job of listRawJobs){
+            for (const job of listRawJobs) {
                 await invoke('plugin:printer|restart_job', {
-                    printername: printer.name, 
+                    printername: printer.name,
                     jobid: job.Id.toString()
                 })
             }
@@ -649,32 +650,32 @@ export const restart_job = async (jobid: string|null = null): Promise<ResponseRe
  * Resume jobs.
  * @param jobid
  */
-export const resume_job = async (jobid: string|null = null): Promise<ResponseResult> => {
+export const resume_job = async (jobid: string | null = null): Promise<ResponseResult> => {
     try {
         const result = {
             success: true,
             message: "OK"
         }
-        if (jobid != null){
+        if (jobid != null) {
             const idextract = decodeBase64(jobid)
             const [printername = null, id = null] = idextract.split('_@_')
             if (printername == null || id == null) throw new Error('Wrong jobid')
 
             await invoke('plugin:printer|resume_job', {
-                printername, 
+                printername,
                 jobid: id.toString()
             })
 
             return result;
         }
 
-        const listPrinter = await printers()    
-        for (const printer of listPrinter){
-            const result: any = await invoke('plugin:printer|get_jobs', {printername: printer.name})
+        const listPrinter = await printers()
+        for (const printer of listPrinter) {
+            const result: any = await invoke('plugin:printer|get_jobs', { printername: printer.name })
             const listRawJobs = parseIfJSON(result)
-            for (const job of listRawJobs){
+            for (const job of listRawJobs) {
                 await invoke('plugin:printer|resume_job', {
-                    printername: printer.name, 
+                    printername: printer.name,
                     jobid: job.Id.toString()
                 })
             }
@@ -693,32 +694,32 @@ export const resume_job = async (jobid: string|null = null): Promise<ResponseRes
  * Pause jobs.
  * @param jobid
  */
-export const pause_job = async (jobid: string|null = null): Promise<ResponseResult> => {
+export const pause_job = async (jobid: string | null = null): Promise<ResponseResult> => {
     try {
         const result = {
             success: true,
             message: "OK"
         }
-        if (jobid != null){
+        if (jobid != null) {
             const idextract = decodeBase64(jobid)
             const [printername = null, id = null] = idextract.split('_@_')
             if (printername == null || id == null) throw new Error('Wrong jobid')
 
             await invoke('plugin:printer|pause_job', {
-                printername, 
+                printername,
                 jobid: id.toString()
             })
 
             return result;
         }
 
-        const listPrinter = await printers()    
-        for (const printer of listPrinter){
-            const result: any = await invoke('plugin:printer|get_jobs', {printername: printer.name})
+        const listPrinter = await printers()
+        for (const printer of listPrinter) {
+            const result: any = await invoke('plugin:printer|get_jobs', { printername: printer.name })
             const listRawJobs = parseIfJSON(result)
-            for (const job of listRawJobs){
+            for (const job of listRawJobs) {
                 await invoke('plugin:printer|pause_job', {
-                    printername: printer.name, 
+                    printername: printer.name,
                     jobid: job.Id.toString()
                 })
             }
@@ -737,32 +738,32 @@ export const pause_job = async (jobid: string|null = null): Promise<ResponseResu
  * Remove jobs.
  * @param jobid
  */
-export const remove_job = async (jobid: string|null = null): Promise<ResponseResult> => {
+export const remove_job = async (jobid: string | null = null): Promise<ResponseResult> => {
     try {
         const result = {
             success: true,
             message: "OK"
         }
-        if (jobid != null){
+        if (jobid != null) {
             const idextract = decodeBase64(jobid)
             const [printername = null, id = null] = idextract.split('_@_')
             if (printername == null || id == null) throw new Error('Wrong jobid')
 
             await invoke('plugin:printer|remove_job', {
-                printername, 
+                printername,
                 jobid: id.toString()
             })
 
             return result;
         }
 
-        const listPrinter = await printers()    
-        for (const printer of listPrinter){
-            const result: any = await invoke('plugin:printer|get_jobs', {printername: printer.name})
+        const listPrinter = await printers()
+        for (const printer of listPrinter) {
+            const result: any = await invoke('plugin:printer|get_jobs', { printername: printer.name })
             const listRawJobs = parseIfJSON(result)
-            for (const job of listRawJobs){
+            for (const job of listRawJobs) {
                 await invoke('plugin:printer|remove_job', {
-                    printername: printer.name, 
+                    printername: printer.name,
                     jobid: job.Id.toString()
                 })
             }

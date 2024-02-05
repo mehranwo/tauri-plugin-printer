@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.remove_job = exports.pause_job = exports.resume_job = exports.restart_job = exports.job = exports.jobs = exports.print_file = exports.print = exports.printers = void 0;
-const tauri_1 = require("@tauri-apps/api/core");
+const core_1 = require("@tauri-apps/api/core");
 const constants_1 = require("./constants");
 const buffer_1 = require("buffer");
-const http_1 = require("@tauri-apps/plugin-http");
+const plugin_http_1 = require("@tauri-apps/plugin-http");
 const mime_1 = require("mime");
 const qrcode_1 = require("qrcode");
 const JsBarcode = require("jsbarcode");
-const window_1 = require("@tauri-apps/api/window");
+const webview_1 = require("@tauri-apps/api/webview");
 const _html2canvas = require("html2canvas");
 const html2canvas = _html2canvas;
 const jspdf_1 = require("jspdf");
@@ -48,7 +48,7 @@ const decodeBase64 = (str) => {
 const printers = async (id = null) => {
     if (id != null) {
         const printername = decodeBase64(id);
-        const result = await (0, tauri_1.invoke)('plugin:printer|get_printers_by_name', {
+        const result = await (0, core_1.invoke)('plugin:printer|get_printers_by_name', {
             printername
         });
         const item = parseIfJSON(result, null);
@@ -71,7 +71,7 @@ const printers = async (id = null) => {
             }
         ];
     }
-    const result = await (0, tauri_1.invoke)('plugin:printer|get_printers');
+    const result = await (0, core_1.invoke)('plugin:printer|get_printers');
     const listRaw = parseIfJSON(result);
     const printers = [];
     for (let i = 0; i < listRaw.length; i++) {
@@ -129,10 +129,11 @@ const print = async (data, options) => {
             const image = document.createElement('img');
             image.width = 100,
                 image.height = 100;
-            const client = await (0, http_1.getClient)();
-            const response = await client.get(item.url, {
-                responseType: http_1.ResponseType.Binary
-            });
+            // const client = await getClient();
+            // const response: any = await client.get(item.url, {
+            //     responseType: ResponseType.Binary
+            // });
+            const response = await (0, plugin_http_1.fetch)(item.url);
             image.src = `data:${mime_1.default.getType(item.url)};base64,${buffer_1.Buffer.from(response.data).toString('base64')}`;
             if (item.width) {
                 image.width = item.width;
@@ -277,7 +278,7 @@ const print = async (data, options) => {
     document.body.appendChild(hidder);
     const wrapper = document.querySelector('#wrapper');
     if (options.preview == true) {
-        const webview = new window_1.WebviewWindow(Date.now().toString(), {
+        const webview = new webview_1.WebviewWindow(Date.now().toString(), {
             url: `data:text/html,${htmlData}`,
             title: "Print Preview",
             width: wrapper.clientWidth,
@@ -350,7 +351,7 @@ const print = async (data, options) => {
     }
     const printerSettingStr = `-print-settings ${rangeStr},${printerSettings.paper},${printerSettings.method},${printerSettings.scale},${printerSettings.orientation},${printerSettings.color_type},${printerSettings.repeat}x`;
     const filename = `${Math.floor(Math.random() * 100000000)}_${Date.now()}.pdf`;
-    const tempPath = await (0, tauri_1.invoke)('plugin:printer|create_temp_file', {
+    const tempPath = await (0, core_1.invoke)('plugin:printer|create_temp_file', {
         buffer_data: buffer_1.Buffer.from(buffer).toString('base64'),
         filename
     });
@@ -362,7 +363,7 @@ const print = async (data, options) => {
         printer_setting: printerSettingStr,
         remove_after_print: typeof options.remove_temp != undefined ? options.remove_temp : true
     };
-    await (0, tauri_1.invoke)('plugin:printer|print_pdf', optionsParams);
+    await (0, core_1.invoke)('plugin:printer|print_pdf', optionsParams);
     return {
         success: true,
         message: "OK"
@@ -431,7 +432,7 @@ const print_file = async (options) => {
         if (buffer_1.Buffer.isBuffer(options.file) == false)
             throw new Error('Invalid buffer');
         const filename = `${Math.floor(Math.random() * 100000000)}_${Date.now()}.pdf`;
-        tempPath = await (0, tauri_1.invoke)('plugin:printer|create_temp_file', {
+        tempPath = await (0, core_1.invoke)('plugin:printer|create_temp_file', {
             buffer_data: options.file.toString('base64'),
             filename
         });
@@ -447,7 +448,7 @@ const print_file = async (options) => {
     if (typeof options.file != "undefined") {
         optionsParams.path = tempPath;
     }
-    await (0, tauri_1.invoke)('plugin:printer|print_pdf', optionsParams);
+    await (0, core_1.invoke)('plugin:printer|print_pdf', optionsParams);
     return {
         success: true,
         message: "OK"
@@ -464,7 +465,7 @@ const jobs = async (printerid = null) => {
         const printer = await (0, exports.printers)(printerid);
         if (printer.length == 0)
             return [];
-        const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer[0].name });
+        const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer[0].name });
         let listRawJobs = parseIfJSON(result, []);
         if (listRawJobs.length == undefined)
             listRawJobs = [listRawJobs];
@@ -500,7 +501,7 @@ const jobs = async (printerid = null) => {
     }
     const listPrinter = await (0, exports.printers)();
     for (const printer of listPrinter) {
-        const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
+        const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
         let listRawJobs = parseIfJSON(result, []);
         if (listRawJobs.length == undefined)
             listRawJobs = [listRawJobs];
@@ -545,7 +546,7 @@ const job = async (jobid) => {
     const [printername = null, id = null] = idextract.split('_@_');
     if (printername == null || id == null)
         null;
-    const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs_by_id', { printername: printername, jobid: id });
+    const result = await (0, core_1.invoke)('plugin:printer|get_jobs_by_id', { printername: printername, jobid: id });
     const job = parseIfJSON(result, null);
     return {
         id: jobid,
@@ -589,7 +590,7 @@ const restart_job = async (jobid = null) => {
             const [printername = null, id = null] = idextract.split('_@_');
             if (printername == null || id == null)
                 throw new Error('Wrong jobid');
-            await (0, tauri_1.invoke)('plugin:printer|restart_job', {
+            await (0, core_1.invoke)('plugin:printer|restart_job', {
                 printername,
                 jobid: id.toString()
             });
@@ -597,10 +598,10 @@ const restart_job = async (jobid = null) => {
         }
         const listPrinter = await (0, exports.printers)();
         for (const printer of listPrinter) {
-            const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
+            const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
             const listRawJobs = parseIfJSON(result, []);
             for (const job of listRawJobs) {
-                await (0, tauri_1.invoke)('plugin:printer|restart_job', {
+                await (0, core_1.invoke)('plugin:printer|restart_job', {
                     printername: printer.name,
                     jobid: job.Id.toString()
                 });
@@ -631,7 +632,7 @@ const resume_job = async (jobid = null) => {
             const [printername = null, id = null] = idextract.split('_@_');
             if (printername == null || id == null)
                 throw new Error('Wrong jobid');
-            await (0, tauri_1.invoke)('plugin:printer|resume_job', {
+            await (0, core_1.invoke)('plugin:printer|resume_job', {
                 printername,
                 jobid: id.toString()
             });
@@ -639,10 +640,10 @@ const resume_job = async (jobid = null) => {
         }
         const listPrinter = await (0, exports.printers)();
         for (const printer of listPrinter) {
-            const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
+            const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
             const listRawJobs = parseIfJSON(result);
             for (const job of listRawJobs) {
-                await (0, tauri_1.invoke)('plugin:printer|resume_job', {
+                await (0, core_1.invoke)('plugin:printer|resume_job', {
                     printername: printer.name,
                     jobid: job.Id.toString()
                 });
@@ -673,7 +674,7 @@ const pause_job = async (jobid = null) => {
             const [printername = null, id = null] = idextract.split('_@_');
             if (printername == null || id == null)
                 throw new Error('Wrong jobid');
-            await (0, tauri_1.invoke)('plugin:printer|pause_job', {
+            await (0, core_1.invoke)('plugin:printer|pause_job', {
                 printername,
                 jobid: id.toString()
             });
@@ -681,10 +682,10 @@ const pause_job = async (jobid = null) => {
         }
         const listPrinter = await (0, exports.printers)();
         for (const printer of listPrinter) {
-            const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
+            const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
             const listRawJobs = parseIfJSON(result);
             for (const job of listRawJobs) {
-                await (0, tauri_1.invoke)('plugin:printer|pause_job', {
+                await (0, core_1.invoke)('plugin:printer|pause_job', {
                     printername: printer.name,
                     jobid: job.Id.toString()
                 });
@@ -715,7 +716,7 @@ const remove_job = async (jobid = null) => {
             const [printername = null, id = null] = idextract.split('_@_');
             if (printername == null || id == null)
                 throw new Error('Wrong jobid');
-            await (0, tauri_1.invoke)('plugin:printer|remove_job', {
+            await (0, core_1.invoke)('plugin:printer|remove_job', {
                 printername,
                 jobid: id.toString()
             });
@@ -723,10 +724,10 @@ const remove_job = async (jobid = null) => {
         }
         const listPrinter = await (0, exports.printers)();
         for (const printer of listPrinter) {
-            const result = await (0, tauri_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
+            const result = await (0, core_1.invoke)('plugin:printer|get_jobs', { printername: printer.name });
             const listRawJobs = parseIfJSON(result);
             for (const job of listRawJobs) {
-                await (0, tauri_1.invoke)('plugin:printer|remove_job', {
+                await (0, core_1.invoke)('plugin:printer|remove_job', {
                     printername: printer.name,
                     jobid: job.Id.toString()
                 });
